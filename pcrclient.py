@@ -22,14 +22,19 @@ def get_api_root(qudao):
             "https://l2-prod-all-gs-gzlj.bilibiligame.net",
             "https://l3-prod-all-gs-gzlj.bilibiligame.net"
         ])
-
+    elif qudao == 1:
+        return random.choice([
+            "https://l1-prod-uo-gs-gzlj.bilibiligame.net",
+            "https://l2-prod-uo-gs-gzlj.bilibiligame.net/",
+            "https://l3-prod-uo-gs-gzlj.bilibiligame.net/"
+        ])
 config = join(dirname(__file__), 'version.txt')
 
 defaultHeaders = {
     'Accept-Encoding': 'gzip',
     'User-Agent': 'Dalvik/2.1.0 (Linux, U, Android 5.1.1, PCRT00 Build/LMY48Z)',
     'X-Unity-Version': '2018.4.30f1',
-    'APP-VER': "4.9.9",
+    'APP-VER': "9.9.9",
     'BATTLE-LOGIC-VERSION': '4',
     'BUNDLE-VER': '',
     'DEVICE': '2',
@@ -66,6 +71,8 @@ class pcrclient:
         self.headers['PLATFORM-ID'] = self.bsdk.platform
         self.client = httpx.AsyncClient()
         self.call_lock = asyncio.Lock()
+        if self.bsdk.qudao == 1:
+            self.headers["RES-KEY"] = "d145b29050641dac2f8b19df0afe0e59"
     
     @staticmethod
     def createkey() -> bytes:

@@ -73,7 +73,7 @@ async def query(acccount_info, is_force=False):
             client = client_cache[player]
             if await check_client(client):
                 return client
-        client = pcrclient(bsdkclient(acccount_info, captchaVerifier))
+        client = pcrclient(bsdkclient(acccount_info))
         await client.login()
         if await check_client(client):
             client_cache[player] = client
@@ -85,7 +85,7 @@ async def query(acccount_info, is_force=False):
 
 @on_command("绑定账号")
 async def bind_support(session):
-    acccount = {'platform': 2, 'channel': 1, }
+    acccount = {'platform': 4, 'channel': 1, }
     content = session.ctx['message'].extract_plain_text().split()
     qq_id = session.ctx['user_id']
     if len(content) != 3:
