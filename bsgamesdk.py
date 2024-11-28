@@ -76,11 +76,10 @@ async def login(bili_account, bili_pwd, make_captch):
 
 class bsdkclient:
 
-    def __init__(self, acccountinfo: dict, captchaVerifier=None):
+    def __init__(self, acccountinfo: dict):
         self.acccountinfo = acccountinfo
-        self.qudao = 0
-        self.platform = "2"
-        self.captchaVerifier = captchaVerifier
+        self.qudao = 1
+        self.platform = "4"
 
     async def b_login(self):
         if self.qudao == 0:
@@ -89,3 +88,5 @@ class bsdkclient:
                 if resp['code'] == 0:
                     logger.info("geetest or captcha succeed")
                     return resp['uid'], resp['access_key']
+        elif self.qudao == 1:
+            return self.acccountinfo['account'], self.acccountinfo['password']
