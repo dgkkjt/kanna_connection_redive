@@ -1,3 +1,4 @@
+import os.path
 from os.path import dirname, join
 import traceback
 from msgpack import packb, unpackb
@@ -29,6 +30,22 @@ def get_api_root(qudao):
             "https://l3-prod-uo-gs-gzlj.bilibiligame.net/"
         ])
 config = join(dirname(__file__), 'version.txt')
+
+
+def _get_version() -> str:
+    version = join(dirname(__file__), 'version.txt')
+    if os.path.exists(version):
+        with open(version, encoding='utf-8') as ver:
+            return ver.read().strip()
+    else:
+        with open(join(dirname(__file__), 'version.origin.txt'), encoding='utf-8') as ver:
+            return ver.read().strip()
+
+
+def _set_version(version: str):
+    with open(join(dirname(__file__), 'version.txt'), mode='w', encoding='utf-8') as ver:
+        ver.write(version)
+
 
 defaultHeaders = {
     'Accept-Encoding': 'gzip',
@@ -71,6 +88,7 @@ class pcrclient:
         self.headers['PLATFORM-ID'] = self.bsdk.platform
         self.client = httpx.AsyncClient()
         self.call_lock = asyncio.Lock()
+
         if self.bsdk.qudao == 1:
             self.headers["RES-KEY"] = "d145b29050641dac2f8b19df0afe0e59"
     
@@ -117,7 +135,7 @@ class pcrclient:
                     request['viewer_id'] = b64encode(pcrclient.encrypt(
                         str(self.viewer_id), key)) if crypted else str(self.viewer_id)
                 response = (await self.client.post(get_api_root(self.bsdk.qudao) + apiurl, data=pcrclient.pack(request, key) if crypted else str(request).encode('utf8'), headers=self.headers, timeout=20)).content
-                
+
                 response = pcrclient.unpack(
                     response)[0] if crypted else loads(response)
 
@@ -147,11 +165,9 @@ class pcrclient:
         if "store_url" in data_headers:
             if version := re.compile(r"\d\.\d\.\d").findall(data_headers["store_url"]):
                 version = version[0]
-                with open(config, "w", encoding='utf-8') as fp:
-                    print(version, file=fp)
+                _set_version(version)
             else:
-                with open(config, encoding='utf-8') as fp:
-                    version = fp.read().strip()
+                version = _get_version()
             defaultHeaders['APP-VER'] = version
             self.headers['APP-VER'] = version
             gamestart, data_headers = await self.callapi('/check/game_start', {'apptype': 0, 'campaign_data': '', 'campaign_user': randint(0, 99999)}, header=True)
@@ -171,13 +187,13 @@ class pcrclient:
 
         if 'REQUEST-ID' in self.headers:
             self.headers.pop('REQUEST-ID')
-        
+
         manifest = await self.callapi('/source_ini/get_maintenance_status?format=json', {}, False, noerr=True)
         if 'maintenance_message' in manifest:
             match = re.search('\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d',
                               manifest['maintenance_message']).group()
             raise ApiException("服务器在维护", parse(match))
-        
+
         ver = manifest['required_manifest_ver']
         logger.info(f'using manifest ver = {ver}')
         self.headers['MANIFEST-VER'] = str(ver)
