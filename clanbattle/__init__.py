@@ -222,6 +222,15 @@ async def daostate(bot, ev):
                     member_info = await bot.get_group_member_info(group_id=group_id, user_id=uid)
                     name = member_info["card"] or member_info["nickname"]
                     msg += f"->{i+1}：{name} {text} 已过去{format_time(now - apply_time)}\n"
+            if tree_info := clan_info.tree.get_tree(i):
+                msg += f"\n========={i}王=========\n"
+                msg += f"{i}王树上目前有{len(tree_info)}人\n"
+                for i, info in enumerate(info):
+                    uid, tree_time, text = info
+                    info = await bot.get_group_member_info(group_id=ev.group_id, user_id=uid)
+                    name = "card" if info["card"] else "nickname"
+                    msg += f"->{i+1}：{info[name]} {text} 已过去{format_time(now - tree_time)}\n"
+                        
         await safe_send(bot, ev, msg.strip())
     else:
         await bot.send(ev, "未查询到本群当前进度，请开启出刀监控")
