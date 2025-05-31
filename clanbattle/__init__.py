@@ -239,7 +239,8 @@ async def daostate(bot, ev):
         if clan_info.loop_check:
             msg += '开启'
             member_info = await bot.get_group_member_info(group_id=group_id, user_id=clan_info.qq_id)
-            msg += f'\n监控人为：{member_info["card"] or member_info["nickname"]}'
+            account = (clan_info.user_name or member_info["card"] or member_info["nickname"])
+            msg += f'\n监控人为：{account}'
             msg += "(高占用)" if now - clan_info.loop_check > 30 else ""
         else:
             msg += '关闭'
@@ -281,7 +282,8 @@ async def bosstate(bot, ev):
         if clan_info.loop_check:
             msg += '开启'
             member_info = await bot.get_group_member_info(group_id=group_id, user_id=clan_info.qq_id)
-            msg += f'\n监控人为：{member_info["card"] or member_info["nickname"]}'
+            account = (clan_info.user_name or member_info["card"] or member_info["nickname"])           
+            msg += f'\n监控人为：{account}'
             msg += "(高占用)" if now - clan_info.loop_check > 30 else ""
         else:
             msg += '关闭'

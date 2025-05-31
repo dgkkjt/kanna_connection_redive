@@ -32,7 +32,9 @@ class ClanBattle:
             self.client = client  # api client
             self.qq_id = qq_id
             home_index = await self.client.callapi('/home/index', {'message_id': 1, 'tips_id_list': [], 'is_first': 1, 'gold_history': 0})
+            load_index = await self.client.callapi('/load/index', {'carrier': 'OPPO'})
             self.clan_id = home_index['user_clan']['clan_id']
+            self.user_name = load_index['user_info']['user_name']
             clan_battle_top = await self.get_clanbattle_top()
             self.clan_battle_id = clan_battle_top["clan_battle_id"]
             self.lap_num = clan_battle_top["lap_num"]
