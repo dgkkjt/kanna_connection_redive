@@ -74,8 +74,10 @@ async def add_monitor(bot, ev):
         await bot.send(ev, "你没有绑定账号")
         return
 
-    account = acccountinfo[0].get("account") or acccountinfo[0].get("viewer_id") 
-    await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account[:3]}******{account[-3:]}")
+    member_info = await bot.get_group_member_info(group_id=group_id, user_id=qq_id)
+    account = (acccountinfo[0].get("name") or acccountinfo[0].get("viewer_id") or member_info["card"] or member_info["nickname"] or "未知账号")
+    await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account}")
+    #await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account[:3]}******{account[-3:]}")
     
     try:
         client = await query(acccountinfo)
