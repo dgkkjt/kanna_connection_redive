@@ -136,7 +136,7 @@ class ClanBattle:
                                     flag = 0
                                     break
                     # FIXME:开销有点大
-                    """
+                    
                     # 伤害修正开始
                     if flag == 1:
                         damage_report = await self.client.callapi('/clan_battle/damage_report', {'clan_id': int(self.clan_id), 'clan_battle_id': int(self.clan_battle_id), 'lap_num': int(lap), 'order_num': int(boss)})
@@ -146,7 +146,7 @@ class ClanBattle:
                                 damage = damage_fix - self.record.get_past_damage(lap, boss, pcrid)
                                 break
                     # 伤害修正结束
-                    """
+                    
 
                     dao_list.append((pcrid, name, time, lap, boss, damage, flag,
                                     battle_log_id, remain_time, battle_time, *units_list))
