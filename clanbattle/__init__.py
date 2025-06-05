@@ -59,7 +59,7 @@ async def query_help(bot, ev):
 @sv.on_fullmatch('出刀监控')
 async def add_monitor(bot, ev):
     qq_id = ev.user_id
-    ev.message = ev.message.extract_plain_text().strip()
+
     if ev.message[0].type == 'at':
         if not priv.check_priv(ev, priv.ADMIN):
             await bot.send(ev, '权限不足')
