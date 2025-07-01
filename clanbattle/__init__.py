@@ -74,8 +74,10 @@ async def add_monitor(bot, ev):
         await bot.send(ev, "你没有绑定账号")
         return
 
-    account = acccountinfo[0].get("account") or acccountinfo[0].get("viewer_id") 
-    await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account[:3]}******{account[-3:]}")
+    member_info = await bot.get_group_member_info(group_id=group_id, user_id=qq_id)
+    account = (acccountinfo[0].get("name") or acccountinfo[0].get("viewer_id") or member_info["card"] or member_info["nickname"] or "未知账号")
+    await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account}")
+    #await bot.send(ev, f"正在登录账号，请耐心等待，当前监控账号为{account[:3]}******{account[-3:]}")
     
     try:
         client = await query(acccountinfo)
@@ -195,7 +197,7 @@ async def delete_monitor(bot, ev):
         await bot.send(ev, "本群未曾开过出刀监控")
 
 
-@sv.on_fullmatch('状态')
+'''@sv.on_fullmatch('状态')
 async def daostate(bot, ev):
     group_id = ev.group_id
     if group_id in clanbattle_info:
@@ -221,12 +223,55 @@ async def daostate(bot, ev):
                     uid, apply_time, text = info
                     member_info = await bot.get_group_member_info(group_id=group_id, user_id=uid)
                     name = member_info["card"] or member_info["nickname"]
-                    msg += f"->{i+1}：{name} {text} 已过去{format_time(now - apply_time)}\n"
+                    msg += f"->{i+1}：{name} {text} 已过去{format_time(now - apply_time)}\n"          
+        await safe_send(bot, ev, msg.strip())
+    else:
+        await bot.send(ev, "未查询到本群当前进度，请开启出刀监控")'''
+        
+        
+@sv.on_fullmatch('状态')
+async def daostate(bot, ev):
+    group_id = ev.group_id
+    if group_id in clanbattle_info:
+        clan_info: ClanBattle = clanbattle_info[group_id]
+        now = time.time()
+        msg = f'当前排名：{clan_info.rank}\n监控状态：'
+        if clan_info.loop_check:
+            msg += '开启'
+            member_info = await bot.get_group_member_info(group_id=group_id, user_id=clan_info.qq_id)
+            account = (clan_info.user_name or member_info["card"] or member_info["nickname"])
+            msg += f'\n监控人为：{account}'
+            msg += "(高占用)" if now - clan_info.loop_check > 30 else ""
+        else:
+            msg += '关闭'
+        msg += "\n" + clan_info.general_boss()
+        await safe_send(bot, ev, msg)
+
+        msg = ""
+        for i in range(1, 5 + 1):
+            apply_info = clan_info.apply.get_apply(i)
+            tree_info = clan_info.tree.get_tree(i)
+            if apply_info or tree_info:
+                msg += f"========={i}王=========\n"
+                if apply_info:
+                    msg += f"当前有{len(apply_info)}人申请挑战boss\n"
+                    for idx, info in enumerate(apply_info):
+                        uid, apply_time, text = info
+                        member_info = await bot.get_group_member_info(group_id=group_id, user_id=uid)
+                        name = member_info["card"] or member_info["nickname"]
+                        msg += f"->{idx+1}：{name} {text} 已过去{format_time(now - apply_time)}\n"
+                if tree_info:
+                    msg += f"当前有{len(tree_info)}人在树上\n"
+                    for jdx, info in enumerate(tree_info):
+                        uid, tree_time, text = info
+                        member_info = await bot.get_group_member_info(group_id=ev.group_id, user_id=uid)
+                        name = member_info["card"] or member_info["nickname"]
+                        msg += f"->{jdx+1}：{name} {text} 已过去{format_time(now - tree_time)}\n"
         await safe_send(bot, ev, msg.strip())
     else:
         await bot.send(ev, "未查询到本群当前进度，请开启出刀监控")
-
-
+        
+        
 @sv.on_fullmatch('boss状态')
 async def bosstate(bot, ev):
     group_id = ev.group_id
@@ -237,7 +282,8 @@ async def bosstate(bot, ev):
         if clan_info.loop_check:
             msg += '开启'
             member_info = await bot.get_group_member_info(group_id=group_id, user_id=clan_info.qq_id)
-            msg += f'\n监控人为：{member_info["card"] or member_info["nickname"]}'
+            account = (clan_info.user_name or member_info["card"] or member_info["nickname"])           
+            msg += f'\n监控人为：{account}'
             msg += "(高占用)" if now - clan_info.loop_check > 30 else ""
         else:
             msg += '关闭'
@@ -647,3 +693,13 @@ async def resatrt_remind(bot, ev):
         except Exception as e:
             pass
     await write_config(run_path, {})
+
+@sv.scheduled_job('cron', hour='5', minute='5') #推送5点时的名次
+async def rank_and_status():
+    bot = get_bot()
+    for group_id in run_group:
+        clan_info: ClanBattle = clanbattle_info[group_id]
+        msg = f'凌晨5点时的排名为：{clan_info.rank}'
+        if not clan_info.loop_check:
+            continue
+        await bot.send_group_msg(group_id = group_id, message = msg)
