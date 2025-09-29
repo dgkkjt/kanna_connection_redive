@@ -129,24 +129,46 @@ class ClanBattle:
                     # 故意不重试，这循环极端情况下运行10分钟也正常，不如报错趁早退出，下次再来
                     time_line = await self.client.callapi('/clan_battle/timeline_report', {"target_viewer_id": pcrid, "clan_battle_id": self.clan_battle_id, "battle_log_id": battle_log_id})
                     remain_time, battle_time = time_line["start_remain_time"], time_line["battle_time"]
-                    flag = 0 if remain_time == 90 else 0.5
+                    '''flag = 0 if remain_time == 90 else 0.5
                     if battle_time < 90 and flag == 0:
                         flag = 1
                         if damage_history[-1]["create_time"] <= time <= damage_history[0]["create_time"]:
                             for history in damage_history:
                                 if history["create_time"] == time and not history["kill"]:
                                     flag = 0
+                                    break'''
+                    ############################new#############################################################
+                    # flag: 1=尾刀, 0.5=补偿刀, 0=完整刀
+                    if remain_time < 90:
+                        if battle_time < 90:
+                            flag = 0.5  # 补偿刀
+                        else:
+                            flag = 1
+                    else: # remain_time == 90
+                        flag = 0 # 默认为完整刀
+                        # 检查是否为用时90秒的尾刀
+                        if damage_history[-1]["create_time"] <= time <= damage_history[0]["create_time"]:
+                            for history in damage_history:
+                                if history["create_time"] == time and history["kill"]:
+                                    flag = 1  # 确认是尾刀
                                     break
+                    ############################new#############################################################       
                     # FIXME:开销有点大
                     
                     # 伤害修正开始
                     if flag == 1:
                         damage_report = await self.client.callapi('/clan_battle/damage_report', {'clan_id': int(self.clan_id), 'clan_battle_id': int(self.clan_battle_id), 'lap_num': int(lap), 'order_num': int(boss)})
                         for it in damage_report['damage_report']:
-                            if pcrid in it:
+                            if it.get('viewer_id') == pcrid:
+                            #if pcrid in it:
                                 damage_fix = it['damage']
-                                damage = damage_fix - self.record.get_past_damage(lap, boss, pcrid)
-                                break
+                                past_damage = self.record.get_past_damage(lap, boss, pcrid)
+                                if damage_fix > damage and past_damage > 0:
+                                    damage = damage_fix - past_damage
+                                    break
+                                else:
+                                    damage = damage_fix
+                                    break
                     # 伤害修正结束
                     
 

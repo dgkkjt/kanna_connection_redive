@@ -140,7 +140,7 @@ async def add_monitor(bot, ev):
                     for history in clan_battle_top["damage_history"]:
                         if history["create_time"] > clan_info.latest_time:
                             clan_info.notice_dao.append(
-                                f'{history["name"]}对{history["lap_num"]}周目{history["order_num"]}王造成了{history["damage"]}点伤害。')
+                                f'{history["name"]}对{history["lap_num"]}周目{history["order_num"]}王造成了{history["damage"]}点伤害。{"并击破" if history["kill"] else ""}')
                             # 通知挂树，清空申请出刀
                             if history["kill"]:
                                 await safe_send(bot, ev, clan_info.general_boss())
@@ -394,8 +394,15 @@ async def cleansubscirbe(bot, ev):
 @sv.on_fullmatch(('sl', 'SL', "Sl"))
 async def addsl(bot, ev):
     group_id = ev.group_id
+    uid = ev.user_id
+    if ev.message[0].type == 'at':
+        if not priv.check_priv(ev, priv.ADMIN):
+            await bot.send(ev, '权限不足')
+            return
+        else:
+            uid = int(ev.message[0].data['qq'])
     sl_dao = SLDao(group_id)
-    result = sl_dao.add_sl(ev.user_id)
+    result = sl_dao.add_sl(uid)
     if result == 0:
         await bot.send(ev, 'SL已记录', at_sender=True)
     elif result == 1:
@@ -407,8 +414,15 @@ async def addsl(bot, ev):
 @sv.on_fullmatch(('sl?', 'SL?', 'sl？', 'SL？'))
 async def issl(bot, ev):
     group_id = ev.group_id
+    uid = ev.user_id
+    if ev.message[0].type == 'at':
+        if not priv.check_priv(ev, priv.ADMIN):
+            await bot.send(ev, '权限不足')
+            return
+        else:
+            uid = int(ev.message[0].data['qq'])
     sl_dao = SLDao(group_id)
-    result = sl_dao.check_sl(ev.user_id)
+    result = sl_dao.check_sl(uid)
     if result == 0:
         await bot.send(ev, '今天还没有使用过SL', at_sender=True)
     elif result == 1:
@@ -421,6 +435,12 @@ async def issl(bot, ev):
 async def climbtree(bot, ev):
     group_id = ev.group_id
     uid = ev.user_id
+    if ev.message[0].type == 'at':
+        if not priv.check_priv(ev, priv.ADMIN):
+            await bot.send(ev, '权限不足')
+            return
+        else:
+            uid = int(ev.message[0].data['qq'])
     match = ev['match']
     boss = match.group(2)
     text = match.group(3)
@@ -436,6 +456,12 @@ async def climbtree(bot, ev):
 @sv.on_fullmatch('下树')
 async def offtree(bot, ev):
     uid = ev.user_id
+    if ev.message[0].type == 'at':
+        if not priv.check_priv(ev, priv.ADMIN):
+            await bot.send(ev, '权限不足')
+            return
+        else:
+            uid = int(ev.message[0].data['qq'])
     group_id = ev.group_id
 
     treeDao = TreeDao(group_id)
