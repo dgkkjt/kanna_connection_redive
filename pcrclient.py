@@ -50,7 +50,7 @@ def _set_version(version: str):
 defaultHeaders = {
     'Accept-Encoding': 'gzip',
     'User-Agent': 'Dalvik/2.1.0 (Linux, U, Android 5.1.1, PCRT00 Build/LMY48Z)',
-    'X-Unity-Version': '2018.4.30f1',
+    'X-Unity-Version': '2021.3.20f1c11',
     'APP-VER': "99.99.99",
     'BATTLE-LOGIC-VERSION': '4',
     'BUNDLE-VER': '',
@@ -202,3 +202,4 @@ class pcrclient:
         await self.check_gamestart()
 
         # await self.callapi('/check/check_agreement', {})
+
