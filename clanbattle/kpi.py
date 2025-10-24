@@ -12,7 +12,7 @@ def kpi_dao(damage, order, lap):
     stage = stage_dict[lap2stage(lap)]
     rate = damage / boss_max[stage-1][order-1]
 
-    if stage == 5:
+    if stage == 4:
         if rate > standard["high"]:
             return 1.5 #e面高伤特别奖励
         elif rate > standard["e_high"]:

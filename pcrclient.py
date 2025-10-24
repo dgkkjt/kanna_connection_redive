@@ -14,7 +14,7 @@ from dateutil.parser import parse
 import httpx
 import random
 from loguru import logger
-
+import uuid
 
 def get_api_root(qudao):
     if qudao == 0:
@@ -23,7 +23,12 @@ def get_api_root(qudao):
             "https://l2-prod-all-gs-gzlj.bilibiligame.net",
             "https://l3-prod-all-gs-gzlj.bilibiligame.net"
         ])
-
+    elif qudao == 1:
+        return random.choice([
+            "https://l1-prod-uo-gs-gzlj.bilibiligame.net",
+            "https://l2-prod-uo-gs-gzlj.bilibiligame.net/",
+            "https://l3-prod-uo-gs-gzlj.bilibiligame.net/"
+        ])
 config = join(dirname(__file__), 'version.txt')
 
 
@@ -46,7 +51,7 @@ defaultHeaders = {
     'Accept-Encoding': 'gzip',
     'User-Agent': 'Dalvik/2.1.0 (Linux, U, Android 5.1.1, PCRT00 Build/LMY48Z)',
     'X-Unity-Version': '2021.3.20f1c11',
-    'APP-VER': "11.7.1",
+    'APP-VER': "99.99.99",
     'BATTLE-LOGIC-VERSION': '4',
     'BUNDLE-VER': '',
     'DEVICE': '2',
@@ -83,7 +88,10 @@ class pcrclient:
         self.headers['PLATFORM-ID'] = self.bsdk.platform
         self.client = httpx.AsyncClient()
         self.call_lock = asyncio.Lock()
-
+        self.headers["DEVICE-ID"] = uuid.uuid4().hex
+        if self.bsdk.qudao == 1:
+            self.headers["RES-KEY"] = "d145b29050641dac2f8b19df0afe0e59"
+    
     @staticmethod
     def createkey() -> bytes:
         return bytes([ord('0123456789abcdef'[randint(0, 15)]) for _ in range(32)])
@@ -155,7 +163,7 @@ class pcrclient:
     async def check_gamestart(self):
         gamestart, data_headers = await self.callapi('/check/game_start', {'apptype': 0, 'campaign_data': '', 'campaign_user': randint(0, 99999)}, header=True)
         if "store_url" in data_headers:
-            if version := re.compile(r"\d\.\d\.\d").findall(data_headers["store_url"]):
+            if version := re.compile(r"\d+\.\d+\.\d+").findall(data_headers["store_url"]):
                 version = version[0]
                 _set_version(version)
             else:

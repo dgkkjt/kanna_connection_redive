@@ -73,7 +73,7 @@ async def query(acccount_info, is_force=False):
             client = client_cache[player]
             if await check_client(client):
                 return client
-        client = pcrclient(bsdkclient(acccount_info, captchaVerifier))
+        client = pcrclient(bsdkclient(acccount_info))
         await client.login()
         if await check_client(client):
             client_cache[player] = client
@@ -85,7 +85,7 @@ async def query(acccount_info, is_force=False):
 
 @on_command("绑定账号")
 async def bind_support(session):
-    acccount = {'platform': 2, 'channel': 1, }
+    acccount = {'platform': 4, 'channel': 1, }
     content = session.ctx['message'].extract_plain_text().split()
     qq_id = session.ctx['user_id']
     if len(content) != 3:
@@ -96,8 +96,28 @@ async def bind_support(session):
         try:
             client = await query([acccount.copy()], True)
             if await check_client(client):
+                load_index = await client.callapi('/load/index', {'carrier': 'OPPO'})
+                acccount["name"] = load_index['user_info']['user_name']
+                acccount["viewer_id"] = load_index['user_info']['viewer_id']
                 await write_config(os.path.join(account_path, f'{qq_id}.json'), [acccount])
-                await bot.send_private_msg(user_id=qq_id, message="绑定成功")
+                await bot.send_private_msg(user_id=qq_id, message=f'绑定成功账号，当前账号为{acccount["name"]}')
         except Exception as e:
             logger.info(traceback.format_exc())
             await bot.send_private_msg(user_id=qq_id, message="绑定失败" + str(e))
+
+
+@on_command("删除绑定")
+async def unbind_support(session):
+    qq_id = session.ctx['user_id']
+    account_file = os.path.join(account_path, f'{qq_id}.json')
+    
+    async with bind_lck:
+        try:
+            if os.path.exists(account_file):
+                os.remove(account_file)
+                await bot.send_private_msg(user_id=qq_id, message="已成功解除账号绑定")
+            else:
+                await bot.send_private_msg(user_id=qq_id, message="您尚未绑定过账号")
+        except Exception as e:
+            logger.error(f"删除绑定失败: {str(e)}")
+            await bot.send_private_msg(user_id=qq_id, message="解除绑定失败，请稍后重试")
