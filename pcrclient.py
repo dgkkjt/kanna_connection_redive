@@ -180,6 +180,10 @@ class pcrclient:
         lres, data_headers = await self.callapi('/tool/sdk_login', {'uid': str(self.uid), 'access_key': self.access_key, 'channel': "1", 'platform': self.bsdk.platform}, header=True)
         if 'is_risk' in lres and lres['is_risk'] == 1:
             raise ApiException("账号存在风险", 403)
+        if 'maintenance_message' in lres:
+            match = re.search('\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d',
+                              lres['maintenance_message']).group()
+            raise ApiException("服务器在维护", parse(match))
         self.viewer_id = data_headers['viewer_id']
 
     async def login(self):
