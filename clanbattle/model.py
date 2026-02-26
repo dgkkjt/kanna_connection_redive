@@ -40,7 +40,7 @@ class ClanBattle:
         self.tree = TreeDao(self.group_id)
         self.apply = ApplyDao(self.group_id)
         self.ranking = get_ranking_dao()  # 全局共享的排名数据库
-        self.last_ranking_fetch = 0  # 上次获取排名的时间戳
+        self.last_ranking_minute = -1  # 记录上次执行排名获取时的分钟号，用于判断是否已执行过
 
     async def init(self, client, qq_id):
         try:
@@ -138,20 +138,21 @@ class ClanBattle:
             # 检查当前时间是否为整点过1分钟或半小时过1分钟
             now = datetime.now()
             current_minute = now.minute
+            current_second = now.second
             
             # 只在第1分钟或第31分钟执行（XX:01 或 XX:31）
             if current_minute not in (1, 31):
                 return
             
-            # 检查是否已在最近30分钟内获取过（避免重复获取）
-            current_time = time.time()
-            if self.last_ranking_fetch > 0:
-                time_diff = current_time - self.last_ranking_fetch
-                # 如果距离上次获取少于28分钟，说明已获取过
-                if time_diff < 28 * 60:
-                    return
+            # 如果当前分钟已在本周期内执行过，则跳过（避免重复执行）
+            # 当分钟号改变时（从1->31 或 31->1），自动重置执行状态
+            if self.last_ranking_minute == current_minute:
+                return
             
-            self.last_ranking_fetch = current_time
+            # 标记当前分钟已执行
+            self.last_ranking_minute = current_minute
+            
+            current_time = time.time()
             ranking_data = []
             timestamp = int(current_time)
             
