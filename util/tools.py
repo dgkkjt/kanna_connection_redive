@@ -1,6 +1,7 @@
 import json
 import asyncio
 import os
+from hoshino.modules.multicq_send import group_send
 
 DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 RES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'img')
@@ -95,6 +96,6 @@ async def safe_send(bot, ev, msg):
     if not msg:
         return
     try:
-        await bot.send(ev, msg)
+        await group_send(ev.group_id, msg)
     except:
         pass
