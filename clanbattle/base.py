@@ -128,6 +128,24 @@ async def get_cbreport(data,total_damage,total_score):
     img = grid2imgb64(reply,["排名","昵称","出刀次数","造成伤害","分数","伤害占比","分数占比"])
     return img
 
+async def get_ranking_report(ranking_list, my_clan_id=None):
+    """生成排名报告图片
+    
+    Args:
+        ranking_list: 排名列表数据
+        my_clan_id: 本群的 clan_id（可选，用于标记本群）
+    """
+    reply = []
+    for rank_info in ranking_list:
+        rank = rank_info['rank']
+        clan_name = rank_info['clan_name']
+        leader_name = rank_info['leader_name']
+        damage = rank_info['damage']
+        reply.append([str(rank), clan_name, leader_name, f"{damage:,}"])
+    
+    img = grid2imgb64(reply, ["排名", "公会名", "会长", "伤害"])
+    return img
+
 async def get_kpireport(data):
     return grid2imgb64([[str(index+1),member[1], member[0], str(member[2]), str(member[3])] for index, member in enumerate(data)],["排名","昵称","游戏id","等效出刀", "补正"])
 

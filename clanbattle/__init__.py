@@ -9,6 +9,7 @@ from .base import *
 from .model import ClanBattle
 from .kpi import kpi_report
 from .sql import SubscribeDao, RecordDao, SLDao, TreeDao, ApplyDao
+from ...multicq_send import group_send
 import time
 import asyncio
 from hoshino.modules.multicq_send import group_send
@@ -39,10 +40,13 @@ help_text = '''
 【sl?】栞栞今天有没有用过sl
 【申请出刀 + 数字 + （留言） 】 申请打boss，boss死亡自动清空
 【取消申请】 模拟10次挂10次，老子不打了
+【查看排名】或【排名记录】 查看当前排名（前10和本公会排名）
+【排名详情】 查看完整排名列表（前60）
 '''.strip()
 
 clanbattle_info = {}
 run_group = {}
+ranking_fetch_qq_id = None  # 全局排名获取账号，所有群共用
 semaphore = asyncio.Semaphore(40)
 
 sv = Service(
@@ -88,6 +92,11 @@ async def add_monitor(bot, ev):
         if group_id not in clanbattle_info:
             clanbattle_info[group_id] = ClanBattle(group_id)
         clan_info: ClanBattle = clanbattle_info[group_id]
+        
+        # 全局排名获取账号分配（第一个启动监控的账号负责所有群的排名获取）
+        global ranking_fetch_qq_id
+        if ranking_fetch_qq_id is None:
+            ranking_fetch_qq_id = qq_id
         await clan_info.init(client, qq_id)
     except Exception as e:
         await bot.send(ev, str(e))
@@ -158,6 +167,8 @@ async def add_monitor(bot, ev):
 
                 clan_info.error_count = 0
                 await clan_info.add_record(clan_battle_top["damage_history"], loop_num)
+                # 定期记录排名数据（只让全局指定的账号执行，避免重复获取）
+                await clan_info.record_period_ranking(qq_id)
 
             except Exception as e:
                 print(traceback.format_exc())
@@ -192,6 +203,10 @@ async def delete_monitor(bot, ev):
         clan_info: ClanBattle = clanbattle_info[group_id]
         if qq_id == clan_info.qq_id or priv.check_priv(ev, priv.ADMIN):
             clan_info.loop_num += 1
+            # 如果当前qq_id是全局排名获取账号，清除分配（下一个启动的账号会被重新分配）
+            global ranking_fetch_qq_id
+            if ranking_fetch_qq_id == qq_id:
+                ranking_fetch_qq_id = None
         else:
             await bot.send(ev, "你不是监控人或者管理")
     else:
@@ -697,14 +712,57 @@ async def del_kpi(bot, ev):
     except:
         await bot.send(ev, "删除失败，请检查此角色是否设置过kpi")
 
+
+@sv.on_fullmatch('查看排名', '排名记录')
+async def view_ranking(bot, ev):
+    group_id = ev.group_id
+    if group_id not in clanbattle_info:
+        await bot.send(ev, "未查询到本群当前进度，请开启出刀监控")
+        return
+    
+    clan_info: ClanBattle = clanbattle_info[group_id]
+    ranking_list = clan_info.ranking.get_latest_ranking()
+    
+    if not ranking_list:
+        await bot.send(ev, "暂无排名数据，请等待定期排名记录")
+        return
+    
+    # 获取前10的排名
+    top_10 = ranking_list[:10]
+    img = await get_ranking_report(top_10, clan_info.clan_id)
+    await bot.send(ev, img)
+
+
+@sv.on_fullmatch('排名详情')
+async def view_ranking_detail(bot, ev):
+    group_id = ev.group_id
+    if group_id not in clanbattle_info:
+        await bot.send(ev, "未查询到本群当前进度，请开启出刀监控")
+        return
+    
+    clan_info: ClanBattle = clanbattle_info[group_id]
+    ranking_list = clan_info.ranking.get_latest_ranking()
+    
+    if not ranking_list:
+        await bot.send(ev, "暂无排名数据，请等待定期排名记录")
+        return
+    
+    # 显示前60名（所有获取的排名）
+    img = await get_ranking_report(ranking_list, clan_info.clan_id)
+    await bot.send(ev, img)
+
+
 @sv.scheduled_job('cron', hour='4', minute='59', jitter=50)
 async def init_cb():
+    from .model import get_ranking_dao
     bot = get_bot()
     group_list = await bot.get_group_list()
     group_list = [group['group_id'] for group in group_list]
     for group_id in group_list:
         for db in (RecordDao(group_id), SubscribeDao(group_id), SLDao(group_id), ApplyDao(group_id), TreeDao(group_id)):
             db.refresh()
+    # 排名数据库单独处理（全局共享）
+    get_ranking_dao().refresh()
 
 @sv.on_fullmatch("缓存运行群")
 async def resatrt_remind(bot, ev):
@@ -723,9 +781,19 @@ async def resatrt_remind(bot, ev):
 
 @sv.scheduled_job('cron', hour='5', minute='5') #推送5点时的名次
 async def rank_and_status():
+
+    from .model import get_ranking_dao
+    ranking_dao = get_ranking_dao()
+    ranking_list = ranking_dao.get_latest_ranking()
+    
     for group_id in run_group:
         clan_info: ClanBattle = clanbattle_info[group_id]
         msg = f'凌晨5点时的排名为：{clan_info.rank}'
         if not clan_info.loop_check:
             continue
         await group_send(group_id, msg)
+        
+        # 推送最新的前60名排名图片
+        if ranking_list:
+            img = await get_ranking_report(ranking_list, clan_info.clan_id)
+            await group_send(group_id, img)

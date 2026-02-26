@@ -512,3 +512,112 @@ class RecordDao(SqliteDao):
                                     break
             except:
                 raise
+
+
+class RankingDao:
+    """排名数据库类（全局单一实例，不按 group_id 分类）"""
+    
+    def __init__(self, groupid=None):
+        # ranking 数据库独立存放，不按 groupid 分类
+        DB_PATH = os.path.join(clan_path, 'period_ranking.db')
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        self._dbpath = DB_PATH
+        self._table = 'period_ranking'
+        self._columns = 'rank, clan_name, leader_id, leader_name, damage, timestamp'
+        self._fields = '''
+            rank INT NOT NULL,
+            clan_name VARCHAR(32) NOT NULL,
+            leader_id INT NOT NULL,
+            leader_name VARCHAR(16) NOT NULL,
+            damage INT NOT NULL,
+            timestamp INT NOT NULL
+            '''
+        self._create_table()
+    
+    def _connect(self):
+        return sqlite3.connect(self._dbpath, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+    
+    def _create_table(self):
+        sql = "CREATE TABLE IF NOT EXISTS {0} ({1})".format(
+            self._table, self._fields)
+        with self._connect() as conn:
+            conn.execute(sql)
+
+    def add_ranking(self, ranking_data):
+        """
+        添加排名数据
+        ranking_data: [(rank, clan_name, leader_id, leader_name, damage, timestamp), ...]
+        """
+        with self._connect() as conn:
+            try:
+                conn.executemany(
+                    f"INSERT INTO {self._table} (rank, clan_name, leader_id, leader_name, damage, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+                    ranking_data
+                )
+            except (sqlite3.DatabaseError) as e:
+                raise
+
+    def get_latest_ranking(self):
+        """获取最新的排名记录"""
+        with self._connect() as conn:
+            try:
+                result = conn.execute(f'SELECT MAX(timestamp) FROM {self._table}').fetchone()
+                latest_timestamp = result[0] if result[0] else 0
+                if not latest_timestamp:
+                    return None
+                result = conn.execute(
+                    f"SELECT rank, clan_name, leader_id, leader_name, damage, timestamp FROM {self._table} WHERE timestamp = ? ORDER BY rank ASC",
+                    (latest_timestamp,)
+                ).fetchall()
+                return [
+                    {
+                        'rank': r[0],
+                        'clan_name': r[1],
+                        'leader_id': r[2],
+                        'leader_name': r[3],
+                        'damage': r[4],
+                        'timestamp': r[5]
+                    }
+                    for r in result
+                ]
+            except (sqlite3.DatabaseError) as e:
+                raise
+
+    def get_ranking_by_time(self, timestamp):
+        """获取指定时间的排名记录"""
+        with self._connect() as conn:
+            try:
+                result = conn.execute(
+                    f"SELECT rank, clan_name, leader_id, leader_name, damage, timestamp FROM {self._table} WHERE timestamp = ? ORDER BY rank ASC",
+                    (timestamp,)
+                ).fetchall()
+                return [
+                    {
+                        'rank': r[0],
+                        'clan_name': r[1],
+                        'leader_id': r[2],
+                        'leader_name': r[3],
+                        'damage': r[4],
+                        'timestamp': r[5]
+                    }
+                    for r in result
+                ]
+            except (sqlite3.DatabaseError) as e:
+                raise
+
+    def get_all_timestamps(self):
+        """获取所有的时间戳"""
+        with self._connect() as conn:
+            try:
+                result = conn.execute(
+                    f"SELECT DISTINCT timestamp FROM {self._table} ORDER BY timestamp DESC"
+                ).fetchall()
+                return [r[0] for r in result]
+            except (sqlite3.DatabaseError) as e:
+                raise
+
+    def refresh(self):
+        """清除30天前的数据"""
+        with self._connect() as conn:
+            time = datetime.now().timestamp() - 30 * 24 * 3600
+            conn.execute(f"DELETE FROM {self._table} where timestamp < ?", (time,))

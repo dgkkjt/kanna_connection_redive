@@ -1,8 +1,22 @@
 import os
 import traceback
+import time
+import asyncio
+from datetime import datetime
 from .base import CancleError, find_item, format_bignum, format_precent, clan_path
-from .sql import RecordDao, SubscribeDao, TreeDao, ApplyDao
+from .sql import RecordDao, SubscribeDao, TreeDao, ApplyDao, RankingDao
 from ..util.tools import load_config, write_config, lap2stage, stage_dict
+
+
+# 全局排名数据库实例（所有群共享）
+_global_ranking_dao = None
+
+def get_ranking_dao():
+    """获取全局排名数据库实例"""
+    global _global_ranking_dao
+    if _global_ranking_dao is None:
+        _global_ranking_dao = RankingDao()
+    return _global_ranking_dao
 
 
 class ClanBattle:
@@ -25,6 +39,8 @@ class ClanBattle:
         self.subscribe = SubscribeDao(self.group_id)
         self.tree = TreeDao(self.group_id)
         self.apply = ApplyDao(self.group_id)
+        self.ranking = get_ranking_dao()  # 全局共享的排名数据库
+        self.last_ranking_fetch = 0  # 上次获取排名的时间戳
 
     async def init(self, client, qq_id):
         try:
@@ -89,6 +105,92 @@ class ClanBattle:
             "page": page,
         }
         )
+
+    async def fetch_period_ranking(self, page):
+        """获取指定页码的排名数据"""
+        return await self.client.callapi('/clan_battle/period_ranking', {
+            'clan_id': self.clan_id,
+            'clan_battle_id': self.clan_battle_id,
+            'period': 1,
+            'month': 0,
+            'page': page,
+            'is_my_clan': 0,
+            'is_first': 1
+        })
+
+    async def record_period_ranking(self, current_qq_id):
+        """整点过1分钟和半小时过1分钟定期获取并记录排名前60名的数据
+        
+        Args:
+            current_qq_id: 当前监控的qq_id
+        
+        注：仅当 current_qq_id 为全局指定的排名获取账号时才执行
+        执行时间：每小时的第1分钟和第31分钟（如12:01、12:31、13:01、13:31等）
+        """
+        try:
+            # 导入全局变量进行检查
+            from . import ranking_fetch_qq_id
+            
+            # 只有全局指定的账号才能执行排名获取，避免所有账号重复获取
+            if ranking_fetch_qq_id is None or ranking_fetch_qq_id != current_qq_id:
+                return
+            
+            # 检查当前时间是否为整点过1分钟或半小时过1分钟
+            now = datetime.now()
+            current_minute = now.minute
+            
+            # 只在第1分钟或第31分钟执行（XX:01 或 XX:31）
+            if current_minute not in (1, 31):
+                return
+            
+            # 检查是否已在最近30分钟内获取过（避免重复获取）
+            current_time = time.time()
+            if self.last_ranking_fetch > 0:
+                time_diff = current_time - self.last_ranking_fetch
+                # 如果距离上次获取少于28分钟，说明已获取过
+                if time_diff < 28 * 60:
+                    return
+            
+            self.last_ranking_fetch = current_time
+            ranking_data = []
+            timestamp = int(current_time)
+            
+            # 获取前6页（每页10名，共60名）
+            for page in range(6):
+                try:
+                    ranking_info = await self.fetch_period_ranking(page)
+                    if not ranking_info or 'period_ranking' not in ranking_info:
+                        break
+                    
+                    for clan_info in ranking_info['period_ranking']:
+                        rank = clan_info.get('rank', 0) # API中没有直接返回，用0作为占位符
+                        clan_name = clan_info.get('clan_name', '')
+                        leader_id = clan_info.get('leader_viewer_id', 0)
+                        leader_name = clan_info.get('leader_name', '')
+                        damage = clan_info.get('damage', 0)
+                        
+                        ranking_data.append((
+                            rank, clan_name, leader_id, leader_name, damage, timestamp
+                        ))
+                except Exception as e:
+                    print(f"获取排名页{page}失败: {str(e)}")
+                    continue
+                
+                # 每次API调用间隔短暂延迟，避免过快请求
+                await asyncio.sleep(0.5)
+            
+            # 保存排名数据到数据库
+            if ranking_data:
+                await self.save_ranking(ranking_data)
+        except Exception as e:
+            print(f"记录排名数据失败: {traceback.format_exc()}")
+
+    async def save_ranking(self, ranking_data):
+        """保存排名数据到数据库"""
+        try:
+            self.ranking.add_ranking(ranking_data)
+        except Exception as e:
+            print(f"保存排名数据到数据库失败: {str(e)}")
 
     async def add_record(self, damage_history, loop_num):
         log_list = []
