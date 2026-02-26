@@ -94,7 +94,7 @@ async def add_monitor(bot, ev):
         clan_info: ClanBattle = clanbattle_info[group_id]
         
         # 全局排名获取账号分配（第一个启动监控的账号负责所有群的排名获取）
-        global ranking_fetch_qq_id
+        global ranking_fetch_qq_id, run_group
         if ranking_fetch_qq_id is None:
             ranking_fetch_qq_id = qq_id
         await clan_info.init(client, qq_id)
@@ -171,10 +171,10 @@ async def add_monitor(bot, ev):
                 await clan_info.record_period_ranking(qq_id)
 
             except Exception as e:
+                global ranking_fetch_qq_id
                 print(traceback.format_exc())
                 clan_info.loop_check = False
                 del run_group[group_id]
-                global ranking_fetch_qq_id
 
                 # logger.error(traceback.format_exc())
                 if loop_num != clan_info.loop_num:
