@@ -174,19 +174,29 @@ async def add_monitor(bot, ev):
                 print(traceback.format_exc())
                 clan_info.loop_check = False
                 del run_group[group_id]
+                global ranking_fetch_qq_id
 
                 # logger.error(traceback.format_exc())
                 if loop_num != clan_info.loop_num:
                     await bot.send(ev, f"#编号HN000{loop_num}监控已关闭")
+                    # 如果当前qq_id是全局排名获取账号，监控停止时也要清除分配
+                    if ranking_fetch_qq_id == qq_id:
+                        ranking_fetch_qq_id = None
                     return
 
                 if not await check_client(clan_info.client):
                     await bot.send(ev, "当前账号被顶号，监控已退出")
+                    # 如果当前qq_id是全局排名获取账号，被顶号时也要清除分配
+                    if ranking_fetch_qq_id == qq_id:
+                        ranking_fetch_qq_id = None
                     return
 
                 if clan_info.error_count > 3:
                     clan_info.error_count = 0
                     await bot.send(ev, "超过最大重试次数，监控已退出")
+                    # 如果当前qq_id是全局排名获取账号，重试失败时也要清除分配
+                    if ranking_fetch_qq_id == qq_id:
+                        ranking_fetch_qq_id = None
                     return
 
                 clan_info.loop_check = True
