@@ -11,6 +11,7 @@ from .kpi import kpi_report
 from .sql import SubscribeDao, RecordDao, SLDao, TreeDao, ApplyDao
 import time
 import asyncio
+from hoshino.modules.multicq_send import group_send
 
 help_text = '''
 * “+” 表示空格
@@ -722,10 +723,9 @@ async def resatrt_remind(bot, ev):
 
 @sv.scheduled_job('cron', hour='5', minute='5') #推送5点时的名次
 async def rank_and_status():
-    bot = get_bot()
     for group_id in run_group:
         clan_info: ClanBattle = clanbattle_info[group_id]
         msg = f'凌晨5点时的排名为：{clan_info.rank}'
         if not clan_info.loop_check:
             continue
-        await bot.send_group_msg(group_id = group_id, message = msg)
+        await group_send(group_id, msg)
