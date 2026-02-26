@@ -97,6 +97,18 @@ async def add_monitor(bot, ev):
         global ranking_fetch_qq_id, run_group
         if ranking_fetch_qq_id is None:
             ranking_fetch_qq_id = qq_id
+        else:
+            # 验证当前分配的排名获取账号是否仍然活跃
+            # 如果分配的账号已经不存在于任何活跃的监控中，重新分配给新启动的账号
+            account_still_active = False
+            for gid, cinfo in clanbattle_info.items():
+                if cinfo.qq_id == ranking_fetch_qq_id and cinfo.loop_check:
+                    account_still_active = True
+                    break
+            
+            # 如果原来分配的账号不活跃了，分配给新启动的账号
+            if not account_still_active:
+                ranking_fetch_qq_id = qq_id
         await clan_info.init(client, qq_id)
     except Exception as e:
         await bot.send(ev, str(e))
@@ -178,24 +190,39 @@ async def add_monitor(bot, ev):
                 # logger.error(traceback.format_exc())
                 if loop_num != clan_info.loop_num:
                     await bot.send(ev, f"#编号HN000{loop_num}监控已关闭")
-                    # 如果当前qq_id是全局排名获取账号，监控停止时也要清除分配
+                    # 如果当前qq_id是全局排名获取账号，需要重新分配给其他活跃的监控账号
                     if ranking_fetch_qq_id == qq_id:
-                        ranking_fetch_qq_id = None
+                        new_ranking_fetcher = None
+                        for gid, cinfo in clanbattle_info.items():
+                            if gid != group_id and cinfo.loop_check:
+                                new_ranking_fetcher = cinfo.qq_id
+                                break
+                        ranking_fetch_qq_id = new_ranking_fetcher
                     return
 
                 if not await check_client(clan_info.client):
                     await bot.send(ev, "当前账号被顶号，监控已退出")
-                    # 如果当前qq_id是全局排名获取账号，被顶号时也要清除分配
+                    # 如果当前qq_id是全局排名获取账号，需要重新分配给其他活跃的监控账号
                     if ranking_fetch_qq_id == qq_id:
-                        ranking_fetch_qq_id = None
+                        new_ranking_fetcher = None
+                        for gid, cinfo in clanbattle_info.items():
+                            if gid != group_id and cinfo.loop_check:
+                                new_ranking_fetcher = cinfo.qq_id
+                                break
+                        ranking_fetch_qq_id = new_ranking_fetcher
                     return
 
                 if clan_info.error_count > 3:
                     clan_info.error_count = 0
                     await bot.send(ev, "超过最大重试次数，监控已退出")
-                    # 如果当前qq_id是全局排名获取账号，重试失败时也要清除分配
+                    # 如果当前qq_id是全局排名获取账号，需要重新分配给其他活跃的监控账号
                     if ranking_fetch_qq_id == qq_id:
-                        ranking_fetch_qq_id = None
+                        new_ranking_fetcher = None
+                        for gid, cinfo in clanbattle_info.items():
+                            if gid != group_id and cinfo.loop_check:
+                                new_ranking_fetcher = cinfo.qq_id
+                                break
+                        ranking_fetch_qq_id = new_ranking_fetcher
                     return
 
                 clan_info.loop_check = True
@@ -212,10 +239,16 @@ async def delete_monitor(bot, ev):
         clan_info: ClanBattle = clanbattle_info[group_id]
         if qq_id == clan_info.qq_id or priv.check_priv(ev, priv.ADMIN):
             clan_info.loop_num += 1
-            # 如果当前qq_id是全局排名获取账号，清除分配（下一个启动的账号会被重新分配）
+            # 如果当前qq_id是全局排名获取账号，需要重新分配给其他活跃的监控账号
             global ranking_fetch_qq_id
             if ranking_fetch_qq_id == qq_id:
-                ranking_fetch_qq_id = None
+                # 检查是否还有其他活跃的监控账号
+                new_ranking_fetcher = None
+                for gid, cinfo in clanbattle_info.items():
+                    if gid != group_id and cinfo.loop_check:  # 检查其他群的监控是否活跃
+                        new_ranking_fetcher = cinfo.qq_id
+                        break
+                ranking_fetch_qq_id = new_ranking_fetcher
         else:
             await bot.send(ev, "你不是监控人或者管理")
     else:
