@@ -171,7 +171,6 @@ async def add_monitor(bot, ev):
                 await clan_info.record_period_ranking(qq_id)
 
             except Exception as e:
-                global ranking_fetch_qq_id
                 print(traceback.format_exc())
                 clan_info.loop_check = False
                 del run_group[group_id]
