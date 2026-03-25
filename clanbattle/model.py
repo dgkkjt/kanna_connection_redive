@@ -28,6 +28,7 @@ class ClanBattle:
         self.error_count = 0  # 失败计数
         self.loop_check = False  # 循环检查
         self.group_id = group_id
+        self.qq_id = None  # 用户QQ ID
         self.notice_dao = []
         self.notice_tree = []
         self.notice_fighter = []
